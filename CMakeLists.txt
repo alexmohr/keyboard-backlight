@@ -21,7 +21,7 @@ set(OPTIMIZATION_LEVEL "-O3")
 # -g    Default
 # -g1   Minimal
 # ""    None
-set(DEBUG_LEVEL "-g3")
+set(DEBUG_LEVEL "")
 
 # Configure C++ compiler flags
 set(CMAKE_CXX_FLAGS "${OPTIMIZATION_LEVEL} \
