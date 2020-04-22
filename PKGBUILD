@@ -1,4 +1,4 @@
-# Maintainer: Alexander Mohr keyboard_backlight@mohr.io
+# Maintainer: Alexander Mohr keyboard_backlight at mohr dot io
 
 pkgname=tp-kb-backlight-git
 pkgver=1.0
