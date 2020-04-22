@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.12)
 project(thinkpad_keyboard_backlight)
-set(CMAKE_INSTALL_PREFIX /usr/local/bin)
+set(CMAKE_INSTALL_PREFIX /usr/bin)
 
 
 set(CMAKE_CXX_STANDARD 17)
@@ -30,6 +30,8 @@ set(CMAKE_CXX_FLAGS "${OPTIMIZATION_LEVEL} \
     -Wpedantic \
     -Wextra")
 
+set(SERVICE_TARGET_PATH  /etc/systemd/system/keyboard_backlight.service)
+set(APP_TARGET_PATH ${CMAKE_INSTALL_PREFIX}/keyboard_backlight)
 
 find_package (Threads)
 
@@ -40,10 +42,12 @@ target_link_libraries (keyboard_backlight ${CMAKE_THREAD_LIBS_INIT})
 
 install(TARGETS keyboard_backlight DESTINATION ${CMAKE_INSTALL_PREFIX})
 
-
-# Add custom features to build hex, bin or lst files.
 add_custom_target(service
         DEPENDS keyboard_backlight
         COMMAND sudo cp ${CMAKE_CURRENT_SOURCE_DIR}/keyboard_backlight.service /etc/systemd/system &&
         sudo systemctl enable --now keyboard_backlight.service
-        )
+)
+
+add_custom_target(uninstall
+        COMMAND sudo rm -f ${SERVICE_TARGET_PATH}  ${APP_TARGET_PATH}
+)

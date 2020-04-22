@@ -6,6 +6,11 @@ backlight of a keyboard. It's only tested for thinkpads but may work on
 other devices as well
 
 ## Installation
+
+### Arch Linux
+The package is in the AUR and called  ``tp-kb-backlight-git``
+
+### Install from source
 To build the binary run
 ````
 mkdir build
@@ -18,6 +23,32 @@ Use ``make install`` to install the application and ``make service``
 to install the service and enable the systemd service. 
 
 Make sure to run ``make install`` BEFORE ``make service`` 
+
+### Binary (not recommended)
+Download the latest package from github. Extract it an run the following commands.
+
+````
+sudo cp keyboard_backlight /usr/bin
+sudo cp keyboard_backlight.service /etc/systemd/sytem
+sudo systemctl enable --now keyboard_backlight.service
+```` 
+
+
+# Uninstall
+For automated removal run the command below in the cmake folder
+````
+make uninstall
+````
+
+To manually delete the files 
+````
+sudo systemctl disable --now keyboard_backlight.service
+sudo rm /etc/systemd/system/keyboard_backlight.service
+sudo rm /usr/bin/keyboard_backlight
+````
+
+
+
 
 ## Configuration
 ````
