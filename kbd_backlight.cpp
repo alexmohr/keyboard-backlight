@@ -331,7 +331,8 @@ int main(int argc, char **argv) {
   if (!file_read_uint64(brightnessPath, &originalBrightness_)
 	  || !file_write_uint64(brightnessPath, originalBrightness_)
 	  ) {
-	std::cout << "failed to get/set brightness " << std::endl;
+	std::cout << "Write access to brightness device descriptor failed.\n"
+        "Please run with root privileges" << std::endl;
 	exit(EXIT_FAILURE);
   }
   currentBrightness_ = originalBrightness_;

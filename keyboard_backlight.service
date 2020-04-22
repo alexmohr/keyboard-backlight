@@ -4,7 +4,7 @@ Description=Controls the backlight of the keyboard
 [Service]
 Type=forking
 # Options can be passed via command line
-ExecStart=/usr/local/bin/keyboard_backlight -t 5
+ExecStart=/usr/bin/keyboard_backlight -t 5
 
 [Install]
 WantedBy=default.target
