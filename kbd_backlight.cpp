@@ -70,6 +70,7 @@ void help() {
 		 "    -b set keyboard backlight device path\n"
 		 "       defaults to /sys/class/leds/tpacpi::kbd_backlight\n"
 		 "    -f stay in foreground and do not start daemon\n"
+		 "    -s Set a brightness value from 0..2 and exit\n"
 
   );
 }
@@ -232,13 +233,14 @@ void parse_opts(int argc,
 				unsigned long &timeout,
 				MOUSE_MODE &mouseMode,
 				std::string &backlightPath,
-				bool &foreground) {
+				bool &foreground,
+				long &setBrightness) {
   int c;
   std::istringstream ss;
   std::string token;
   unsigned long mode;
 
-  while ((c = getopt(argc, argv, "i:t:m:b:f")) != -1) {
+  while ((c = getopt(argc, argv, "s:i:t:m:b:f")) != -1) {
 	switch (c) {
 	  case 'b':
 		backlightPath = optarg;
@@ -267,7 +269,13 @@ void parse_opts(int argc,
 		  exit(EXIT_FAILURE);
 		}
 		break;
-
+	  case 's':
+		setBrightness = strtol(optarg, nullptr, 0);
+		if (setBrightness > 2 || setBrightness < 0) {
+		  printf("%s is not a valid brightness\n", optarg);
+		  exit(EXIT_FAILURE);
+		}
+		break;
 	  default:
 		help();
 		exit(EXIT_FAILURE);
@@ -285,6 +293,7 @@ int main(int argc, char **argv) {
   signal(SIGKILL, signal_handler);
 
   unsigned long timeout = 15;
+  long setBrightness = -1;
   MOUSE_MODE mouseMode = MOUSE_MODE::ALL;
   std::string backlightPath = "/sys/class/leds/tpacpi::kbd_backlight";
   bool foreground = false;
@@ -294,7 +303,8 @@ int main(int argc, char **argv) {
 			 timeout,
 			 mouseMode,
 			 backlightPath,
-			 foreground);
+			 foreground,
+			 setBrightness);
 
   get_devices_for_path(ignoredDevices,
 					   "/dev/input/by-path",
@@ -332,9 +342,15 @@ int main(int argc, char **argv) {
 	  || !file_write_uint64(brightnessPath, originalBrightness_)
 	  ) {
 	std::cout << "Write access to brightness device descriptor failed.\n"
-        "Please run with root privileges" << std::endl;
+				 "Please run with root privileges" << std::endl;
 	exit(EXIT_FAILURE);
   }
+
+  if (setBrightness >= 0){
+	file_write_uint64(brightnessPath, setBrightness);
+	exit(0);
+  }
+
   currentBrightness_ = originalBrightness_;
 
   auto fds = open_devices(inputDevices);

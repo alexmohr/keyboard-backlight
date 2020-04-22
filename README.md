@@ -65,6 +65,8 @@ tp_kbd_backlight help
        2 ignore mice
     -b set keyboard backlight device path
        defaults to /sys/class/leds/tpacpi::kbd_backlight
+    -f stay in foreground and do not start daemon
+    -s Set a brightness value from 0..2 and exit
 ````
 
 
