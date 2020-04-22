@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.12)
 project(thinkpad_keyboard_backlight)
+set(CMAKE_INSTALL_PREFIX /usr/local/bin)
+
 
 set(CMAKE_CXX_STANDARD 17)
 
@@ -19,11 +21,19 @@ set(OPTIMIZATION_LEVEL "-O3")
 # -g    Default
 # -g1   Minimal
 # ""    None
-set(DEBUG_LEVEL "")
+set(DEBUG_LEVEL "-g3")
+
+# Configure C++ compiler flags
+set(CMAKE_CXX_FLAGS "${OPTIMIZATION_LEVEL} \
+    ${DEBUG_LEVEL} \
+    -Wall \
+    -Wpedantic \
+    -Wextra")
+
 
 find_package (Threads)
 
-set(CMAKE_INSTALL_PREFIX /usr/local/bin)
+
 
 add_executable(keyboard_backlight kbd_backlight.cpp)
 target_link_libraries (keyboard_backlight ${CMAKE_THREAD_LIBS_INIT})

@@ -25,22 +25,20 @@
 *  SOFTWARE.
  */
 
-
-#include <stdint.h>
-
 #include <linux/input.h>
 #include <fcntl.h>
 #include <unistd.h>
 
 #include <cstdio>
 #include <cstdlib>
+#include <cstdint>
 
 #include <vector>
 #include <string>
 #include <iostream>
 #include <filesystem>
 #include <regex>
-#include <thread>
+#include <future>
 #include <csignal>
 
 using namespace std::chrono_literals;
@@ -178,7 +176,7 @@ void brightness_control(const std::string &brightnessPath,
 #if DEBUG
 	printf("passed: %lu\n", passedSec.count());
 #endif
-	if (passedSec.count() >= timeout) {
+	if (passedSec.count() >= static_cast<long>(timeout)) {
 #if __DEBU
 	  printf("timeout reached \n");
 	  printf("o: %lu c: %lu\n", originalBrightness_, currentBrightness_);
@@ -221,7 +219,6 @@ void read_events(int devFd, const std::string &brightnessPath) {
 void signal_handler(int sig) {
   switch (sig) {
 	case SIGTERM:
-	case SIGKILL:
 	  end_ = true;
 	  break;
 	default:
@@ -257,7 +254,7 @@ void parse_opts(int argc,
 		break;
 	  case 'm':
 		mode = strtoul(optarg, nullptr, 0);
-		if (MOUSE_MODE::ALL > mode | MOUSE_MODE::NONE < mode) {
+		if ((MOUSE_MODE::ALL > mode) | (MOUSE_MODE::NONE < mode)) {
 		  printf("%s is not a valid mouse mode\n", optarg);
 		  exit(EXIT_FAILURE);
 		}
@@ -342,20 +339,26 @@ int main(int argc, char **argv) {
   auto fds = open_devices(inputDevices);
   lastEvent_ = std::chrono::system_clock::now();
 
-  if (!foreground){
+  if (!foreground) {
 	if (daemon(0, 0)) {
 	  printf("failed to daemonize");
 	  exit(EXIT_FAILURE);
 	}
   }
 
-  std::vector<std::thread> threads;
-  for (const auto &fd : fds) {
-	threads.emplace_back(std::thread(read_events, fd, brightnessPath));
-  }
-  threads
-	  .emplace_back(std::thread(brightness_control, brightnessPath, timeout));
+  inputDevices.clear();
+  ignoredDevices.clear();
 
-  for (auto &t : threads)
-	t.join();
+  std::vector<std::future<void>> f;
+  for (const auto &fd : fds) {
+	f.emplace_back(std::async(std::launch::async,
+							  read_events,
+							  fd,
+							  brightnessPath));
+  }
+
+  brightness_control(brightnessPath, timeout);
+
+  for (auto &t : f)
+	t.wait();
 }
