@@ -220,6 +220,7 @@ void read_events(int devFd, const std::string &brightnessPath) {
 void signal_handler(int sig) {
   switch (sig) {
 	case SIGTERM:
+	case SIGKILL:
 	  end_ = true;
 	  break;
 	default:
@@ -339,8 +340,7 @@ int main(int argc, char **argv) {
 
   std::string brightnessPath = backlightPath + "brightness";
   if (!file_read_uint64(brightnessPath, &originalBrightness_)
-	  || !file_write_uint64(brightnessPath, originalBrightness_)
-	  ) {
+	  || !file_write_uint64(brightnessPath, originalBrightness_)) {
 	std::cout << "Write access to brightness device descriptor failed.\n"
 				 "Please run with root privileges" << std::endl;
 	exit(EXIT_FAILURE);
@@ -376,6 +376,5 @@ int main(int argc, char **argv) {
 
   brightness_control(brightnessPath, timeout);
 
-  for (auto &t : f)
-	t.wait();
+  std::terminate();
 }
