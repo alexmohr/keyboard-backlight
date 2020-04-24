@@ -1,8 +1,13 @@
 cmake_minimum_required(VERSION 3.12)
 project(thinkpad_keyboard_backlight)
+set(PROJECT_VERSION_MAJOR  1)
+set(PROJECT_VERSION_MINOR  2)
+set(PROJECT_VERSION_PATCH  1)
+
+# Add version compile definition
+add_compile_definitions(VERSION="${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}")
+
 set(CMAKE_INSTALL_PREFIX /usr/bin)
-
-
 set(CMAKE_CXX_STANDARD 17)
 
 # Configure optimization
@@ -32,18 +37,18 @@ set(CMAKE_CXX_FLAGS "${OPTIMIZATION_LEVEL} \
 
 set(SERVICE_TARGET_PATH  /etc/systemd/system/keyboard_backlight.service)
 set(APP_TARGET_PATH ${CMAKE_INSTALL_PREFIX}/keyboard_backlight)
+set(APP_NAME keyboard_backlight)
 
 find_package (Threads)
 
 
-
-add_executable(keyboard_backlight kbd_backlight.cpp)
+add_executable(${APP_NAME} kbd_backlight.cpp)
 target_link_libraries (keyboard_backlight ${CMAKE_THREAD_LIBS_INIT})
 
 install(TARGETS keyboard_backlight DESTINATION ${CMAKE_INSTALL_PREFIX})
 
 add_custom_target(service
-        DEPENDS keyboard_backlight
+        DEPENDS ${APP_NAME}
         COMMAND sudo cp ${CMAKE_CURRENT_SOURCE_DIR}/keyboard_backlight.service /etc/systemd/system &&
         sudo systemctl enable --now keyboard_backlight.service
 )
@@ -51,3 +56,8 @@ add_custom_target(service
 add_custom_target(uninstall
         COMMAND sudo rm -f ${SERVICE_TARGET_PATH}  ${APP_TARGET_PATH}
 )
+
+# Write version to PKGBUILD
+add_custom_command(TARGET ${APP_NAME} POST_BUILD
+        COMMAND cp ${CMAKE_CURRENT_SOURCE_DIR}/PKGBUILD ${CMAKE_BINARY_DIR} &&
+        sed -i s/VERSION/${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}/g  ${CMAKE_BINARY_DIR}/PKGBUILD)
