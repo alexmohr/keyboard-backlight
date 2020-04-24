@@ -55,8 +55,10 @@ enum MOUSE_MODE {
   NONE = 2
 };
 
-void help() {
-  printf("tp_kbd_backlight help\n"
+void help(const char* name) {
+  printf("%s %s \n", name, VERSION);
+  printf(""
+		 "    -h show this help\n"
 		 "    -i ignore an input device\n"
 		 "       This device does not re enable keyboard backlight.\n"
 		 "       Separate multiple device by space.\n"
@@ -253,7 +255,7 @@ void parse_opts(int argc,
   std::string token;
   unsigned long mode;
 
-  while ((c = getopt(argc, argv, "s:i:t:m:b:f")) != -1) {
+  while ((c = getopt(argc, argv, "hs:i:t:m:b:f")) != -1) {
 	switch (c) {
 	  case 'b':
 		backlightPath = optarg;
@@ -289,8 +291,9 @@ void parse_opts(int argc,
 		  exit(EXIT_FAILURE);
 		}
 		break;
+	  case 'h':
 	  default:
-		help();
+		help(argv[0]);
 		exit(EXIT_FAILURE);
 	}
   }

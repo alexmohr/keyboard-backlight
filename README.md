@@ -52,7 +52,8 @@ sudo rm /usr/bin/keyboard_backlight
 
 ## Configuration
 ````
-tp_kbd_backlight help
+keyboard_backlight 1.2.1 
+    -h show this help
     -i ignore an input device
        This device does not re enable keyboard backlight.
        Separate multiple device by space.
