@@ -230,6 +230,16 @@ void signal_handler(int sig) {
   }
 }
 
+bool is_brightness_writable(const std::string &brightnessPath) {
+  if (!file_read_uint64(brightnessPath, &originalBrightness_)
+	  || !file_write_uint64(brightnessPath, originalBrightness_)) {
+	std::cout << "Write access to brightness device descriptor failed.\n"
+				 "Please run with root privileges" << std::endl;
+	return false;
+  }
+  return true;
+}
+
 void parse_opts(int argc,
 				char *const *argv,
 				std::vector<std::string> &ignoredDevices,
@@ -340,13 +350,9 @@ int main(int argc, char **argv) {
 	backlightPath += '/';
   }
 
-  // check write access to brightness file
   std::string brightnessPath = backlightPath + "brightness";
-  if (!file_read_uint64(brightnessPath, &originalBrightness_)
-	  || !file_write_uint64(brightnessPath, originalBrightness_)) {
-	std::cout << "Write access to brightness device descriptor failed.\n"
-				 "Please run with root privileges" << std::endl;
-	exit(EXIT_FAILURE);
+  if (!is_brightness_writable(brightnessPath)){
+    exit(EXIT_FAILURE);
   }
 
   if (setBrightness >= 0) {
@@ -361,7 +367,7 @@ int main(int argc, char **argv) {
 
   if (!foreground) {
 	if (daemon(0, 0)) {
-	  printf("failed to daemonize");
+	  std::cout << "failed to daemonize" << std::endl;
 	  exit(EXIT_FAILURE);
 	}
   }
