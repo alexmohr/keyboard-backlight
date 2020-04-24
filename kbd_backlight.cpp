@@ -376,5 +376,8 @@ int main(int argc, char **argv) {
 
   brightness_control(brightnessPath, timeout);
 
+  for (const auto &fd : fds) {
+	close(fd);
+  }
   std::terminate();
 }
