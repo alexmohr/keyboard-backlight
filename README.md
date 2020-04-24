@@ -57,7 +57,7 @@ tp_kbd_backlight help
        This device does not re enable keyboard backlight.
        Separate multiple device by space.
        Default: use all mice and keyboard.
-    -t configure timeout after which the backlight will be turned off
+    -t configure timeout in seconds after which the backlight will be turned off
        Defaults to 30s 
     -m configure mouse mode (0..2)
        0 use all mice (default)

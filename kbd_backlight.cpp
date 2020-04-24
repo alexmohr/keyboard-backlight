@@ -61,7 +61,7 @@ void help() {
 		 "       This device does not re enable keyboard backlight.\n"
 		 "       Separate multiple device by space.\n"
 		 "       Default: use all mice and keyboard.\n"
-		 "    -t configure timeout after which the backlight will be turned off\n"
+		 "    -t configure timeout in seconds after which the backlight will be turned off\n"
 		 "       Defaults to 30s \n"
 		 "    -m configure mouse mode (0..2)\n"
 		 "       0 use all mice (default)\n"
@@ -155,38 +155,39 @@ std::vector<int> open_devices(const std::vector<std::string> &input_devices) {
   }
   return fds;
 }
-
 void brightness_control(const std::string &brightnessPath,
-						unsigned long timeout) {
+						unsigned long timeoutMs) {
   while (!end_) {
-	auto passedSec =
-		std::chrono::duration_cast<std::chrono::seconds>(
-			std::chrono::system_clock::now() - lastEvent_);
+	auto passedMs = std::chrono::duration_cast<
+		std::chrono::milliseconds>(
+		std::chrono::system_clock::now() - lastEvent_);
 
 	if (lastEvent_ < std::chrono::system_clock::now()) {
-	  auto sleepTime = std::chrono::milliseconds(
-		  (timeout - passedSec.count()) * 1000);
+	  auto sleepTime = std::chrono::milliseconds(timeoutMs - passedMs.count());
 	  if (0 != sleepTime.count()) {
 		std::this_thread::sleep_for(sleepTime);
 	  }
 	}
 
-	passedSec =
-		std::chrono::duration_cast<std::chrono::seconds>(
-			std::chrono::system_clock::now() - lastEvent_);
+	passedMs = std::chrono::duration_cast<
+		std::chrono::milliseconds>(
+		std::chrono::system_clock::now() - lastEvent_);
 #if DEBUG
-	printf("passed: %lu\n", passedSec.count());
+	printf("passed: %lu\n", passedMs.count());
 #endif
-	if (passedSec.count() >= static_cast<long>(timeout)) {
-#if __DEBU
-	  printf("timeout reached \n");
+	if (passedMs.count() >= static_cast<long>(timeoutMs)) {
+
+#if DEBUG
+	  printf("timeoutMs reached \n");
 	  printf("o: %lu c: %lu\n", originalBrightness_, currentBrightness_);
 #endif
+
 	  if (currentBrightness_ != 0) {
 		file_read_uint64(brightnessPath, &originalBrightness_);
 		currentBrightness_ = 0;
 
 		file_write_uint64(brightnessPath, 0);
+
 #if DEBUG
 		printf("o: %lu c: %lu\n", originalBrightness_, currentBrightness_);
 		printf("turning off \n");
@@ -208,6 +209,7 @@ void read_events(int devFd, const std::string &brightnessPath) {
 	  if (currentBrightness_ != originalBrightness_) {
 		file_write_uint64(brightnessPath, originalBrightness_);
 		currentBrightness_ = originalBrightness_;
+
 #if DEBUG
 		printf("on\n");
 #endif
@@ -338,6 +340,7 @@ int main(int argc, char **argv) {
 	backlightPath += '/';
   }
 
+  // check write access to brightness file
   std::string brightnessPath = backlightPath + "brightness";
   if (!file_read_uint64(brightnessPath, &originalBrightness_)
 	  || !file_write_uint64(brightnessPath, originalBrightness_)) {
@@ -346,7 +349,7 @@ int main(int argc, char **argv) {
 	exit(EXIT_FAILURE);
   }
 
-  if (setBrightness >= 0){
+  if (setBrightness >= 0) {
 	file_write_uint64(brightnessPath, setBrightness);
 	exit(0);
   }
@@ -374,7 +377,7 @@ int main(int argc, char **argv) {
 							  brightnessPath));
   }
 
-  brightness_control(brightnessPath, timeout);
+  brightness_control(brightnessPath, timeout * 1000);
 
   for (const auto &fd : fds) {
 	close(fd);
