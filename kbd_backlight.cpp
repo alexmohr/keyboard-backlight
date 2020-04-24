@@ -379,5 +379,5 @@ int main(int argc, char **argv) {
   for (const auto &fd : fds) {
 	close(fd);
   }
-  std::terminate();
+  exit(0);
 }
