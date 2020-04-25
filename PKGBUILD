@@ -9,6 +9,7 @@ url='https://github.com/alexmohr/keyboard-backlight'
 license=('MIT')
 depends=('libinput')
 makedepends=('git' 'cmake' 'gcc')
+backup=('etc/systemd/system/keyboard_backlight.service')
 
 source=("git+https://github.com/alexmohr/keyboard-backlight")
 sha512sums=('SKIP')
