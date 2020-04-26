@@ -67,7 +67,7 @@ keyboard_backlight 1.2.1
     -b set keyboard backlight device path
        defaults to /sys/class/leds/tpacpi::kbd_backlight
     -f stay in foreground and do not start daemon
-    -s Set a brightness value from 0..2 and exit
+    -s Set a brightness value and exit
 ````
 
 

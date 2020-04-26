@@ -72,7 +72,7 @@ void help(const char* name) {
 		 "    -b set keyboard backlight device path\n"
 		 "       defaults to /sys/class/leds/tpacpi::kbd_backlight\n"
 		 "    -f stay in foreground and do not start daemon\n"
-		 "    -s Set a brightness value from 0..2 and exit\n"
+		 "    -s Set a brightness value and exit\n"
 
   );
 }
@@ -286,10 +286,6 @@ void parse_opts(int argc,
 		break;
 	  case 's':
 		setBrightness = strtol(optarg, nullptr, 0);
-		if (setBrightness > 2 || setBrightness < 0) {
-		  printf("%s is not a valid brightness\n", optarg);
-		  exit(EXIT_FAILURE);
-		}
 		break;
 	  case 'h':
 	  default:
