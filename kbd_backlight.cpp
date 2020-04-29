@@ -184,12 +184,11 @@ void brightness_control(const std::string &brightnessPath,
 	  printf("o: %lu c: %lu\n", originalBrightness_, currentBrightness_);
 #endif
 
+	  file_read_uint64(brightnessPath, &currentBrightness_);
 	  if (currentBrightness_ != 0) {
-		file_read_uint64(brightnessPath, &originalBrightness_);
-		currentBrightness_ = 0;
-
+		originalBrightness_ = currentBrightness_;
+	    currentBrightness_ = 0;
 		file_write_uint64(brightnessPath, 0);
-
 #if DEBUG
 		printf("o: %lu c: %lu\n", originalBrightness_, currentBrightness_);
 		printf("turning off \n");

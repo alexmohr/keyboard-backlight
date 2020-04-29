@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 3.12)
 project(thinkpad_keyboard_backlight)
 set(PROJECT_VERSION_MAJOR  1)
-set(PROJECT_VERSION_MINOR  2)
-set(PROJECT_VERSION_PATCH  1)
+set(PROJECT_VERSION_MINOR  3)
+set(PROJECT_VERSION_PATCH  0)
 
 # Add version compile definition
 add_compile_definitions(VERSION="${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}")
