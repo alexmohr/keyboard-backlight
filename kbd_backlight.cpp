@@ -35,11 +35,13 @@
 
 #include <vector>
 #include <string>
+#include <sstream>
 #include <iostream>
 #include <filesystem>
 #include <regex>
 #include <future>
 #include <csignal>
+#include <fstream>
 
 using namespace std::chrono_literals;
 
@@ -55,7 +57,7 @@ enum MOUSE_MODE {
   NONE = 2
 };
 
-void help(const char* name) {
+void help(const char *name) {
   printf("%s %s \n", name, VERSION);
   printf(""
 		 "    -h show this help\n"
@@ -124,10 +126,64 @@ bool is_device_ignored(const std::string &device,
   return false;
 }
 
-void get_devices_for_path(const std::vector<std::string> &ignoredDevices,
-						  const std::string &devicePath,
-						  const std::regex &regex,
-						  std::vector<std::string> &devices) {
+/* Get keyboards from /proc/bus/input/devices
+ * Example entry
+	I: Bus=0011 Vendor=0001 Product=0001 Version=ab54
+	N: Name="AT Translated Set 2 keyboard"
+	P: Phys=isa0060/serio0/input0
+	S: Sysfs=/devices/platform/i8042/serio0/input/input3
+	U: Uniq=
+	H: Handlers=sysrq kbd event3 leds
+	B: PROP=0
+	B: EV=120013
+	B: KEY=402000000 3803078f800d001 feffffdfffefffff fffffffffffffffe
+ */
+void get_keyboards(std::vector<std::string> &ignoredDevices,
+				   std::vector<std::string> &keyboards) {
+  const std::string path = "/proc/bus/input/devices";
+  std::ifstream file(path);
+  if (!file.is_open()) {
+	return;
+  }
+
+  std::string line;
+  std::string name;
+  std::string token;
+  std::istringstream ss;
+  while (std::getline(file, line)) {
+	// get device name
+	if (line.find("N: ") != std::string::npos) {
+	  if (line.find("keyboard") != std::string::npos) {
+		name = line;
+	  } else {
+		name.clear();
+	  }
+	}
+
+	if (line.find("Handlers=") != std::string::npos) {
+	  // if name is empty here the device is not a keyboard
+	  if (name.empty()) {
+		continue;
+	  }
+
+	  ss = std::istringstream(line);
+	  while (std::getline(ss, token, ' ')) {
+		if (token.find("event") != std::string::npos) {
+		  std::string deviceEventPath = "/dev/input/" + token;
+		  if (!is_device_ignored(deviceEventPath, ignoredDevices)) {
+			keyboards.emplace_back(deviceEventPath);
+		  }
+		  break;
+		}
+	  }
+	}
+  }
+}
+
+void get_devices_in_path(const std::vector<std::string> &ignoredDevices,
+						 const std::string &devicePath,
+						 const std::regex &regex,
+						 std::vector<std::string> &devices) {
   for (const auto &dev : std::filesystem::directory_iterator(devicePath)) {
 	if (is_device_ignored(dev.path(), ignoredDevices)) {
 	  continue;
@@ -157,6 +213,7 @@ std::vector<int> open_devices(const std::vector<std::string> &input_devices) {
   }
   return fds;
 }
+
 void brightness_control(const std::string &brightnessPath,
 						unsigned long timeoutMs) {
   while (!end_) {
@@ -187,7 +244,7 @@ void brightness_control(const std::string &brightnessPath,
 	  file_read_uint64(brightnessPath, &currentBrightness_);
 	  if (currentBrightness_ != 0) {
 		originalBrightness_ = currentBrightness_;
-	    currentBrightness_ = 0;
+		currentBrightness_ = 0;
 		file_write_uint64(brightnessPath, 0);
 #if DEBUG
 		printf("o: %lu c: %lu\n", originalBrightness_, currentBrightness_);
@@ -266,6 +323,22 @@ void parse_opts(int argc,
 		ss = std::istringstream(optarg);
 		while (std::getline(ss, token, ' ')) {
 		  ignoredDevices.push_back(token);
+
+		  // if the device is a symlink add the actual target to the
+		  // ignored device list too
+		  std::filesystem::path p = token;
+		  if (!std::filesystem::exists(p))
+			continue;
+
+		  std::filesystem::current_path(p.parent_path());
+		  if (std::filesystem::is_symlink(p)) {
+			p = std::filesystem::read_symlink(p);
+		  }
+
+		  if (!p.is_absolute()) {
+			p = std::filesystem::canonical(p);
+		  }
+		  ignoredDevices.push_back(p);
 		}
 		break;
 	  case 'm':
@@ -317,23 +390,23 @@ int main(int argc, char **argv) {
 			 foreground,
 			 setBrightness);
 
-  get_devices_for_path(ignoredDevices,
-					   "/dev/input/by-path",
-					   std::regex(".*event\\-kbd.*"),
-					   inputDevices);
+  get_keyboards(ignoredDevices, inputDevices);
+  if (inputDevices.empty()) {
+	std::cout << "Warning no keyboards found!" << std::endl;
+  }
 
   switch (mouseMode) {
 	case ALL:
-	  get_devices_for_path(ignoredDevices,
-						   "/dev/input/",
-						   std::regex(".*mice.*"),
-						   inputDevices);
+	  get_devices_in_path(ignoredDevices,
+						  "/dev/input/",
+						  std::regex(".*mice.*"),
+						  inputDevices);
 	  break;
 	case INTERNAL:
-	  get_devices_for_path(ignoredDevices,
-						   "/dev/input/by-path",
-						   std::regex("..*event\\-mouse.*"),
-						   inputDevices);
+	  get_devices_in_path(ignoredDevices,
+						  "/dev/input/by-path",
+						  std::regex("..*event\\-mouse.*"),
+						  inputDevices);
 	  break;
 	case NONE:
 	  break;
@@ -349,8 +422,8 @@ int main(int argc, char **argv) {
   }
 
   std::string brightnessPath = backlightPath + "brightness";
-  if (!is_brightness_writable(brightnessPath)){
-    exit(EXIT_FAILURE);
+  if (!is_brightness_writable(brightnessPath)) {
+	exit(EXIT_FAILURE);
   }
 
   if (setBrightness >= 0) {
