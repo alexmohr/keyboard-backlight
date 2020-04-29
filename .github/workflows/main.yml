@@ -1,0 +1,25 @@
+name: CMake Build
+on: [push, pull_request]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+    - uses: actions/checkout@v2
+
+    
+    # CMake
+    - name: Configure cmake
+      run: cmake .
+    
+    # Build
+    - name: Run build
+      run: make
+
+
+    - name: Upload Artifact 
+      uses: actions/upload-artifact@v1
+      with:
+        name: binary
+        path: keyboard_backlight
