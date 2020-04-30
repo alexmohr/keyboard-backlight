@@ -252,9 +252,6 @@ void brightness_control(const std::string &brightnessPath,
 	if (passedMs.count() >= static_cast<long>(timeoutMs)) {
 
 	  print_debug_n("Timeout reached \n");
-	  print_debug("Original brightness: %lu Current Brightness: %lu\n",
-				  originalBrightness_,
-				  currentBrightness_);
 
 	  file_read_uint64(brightnessPath, &tmpBrightness);
 	  if (tmpBrightness != 0) {
