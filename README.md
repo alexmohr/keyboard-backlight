@@ -1,5 +1,5 @@
 # Keyboard backlight service
-[![Build Status](https://travis-ci.com/alexmohr/thinkpad-keyboard-backlight.svg?branch=master)](https://travis-ci.com/alexmohr/thinkpad-keyboard-backlight)
+[![Build Status](https://travis-ci.com/alexmohr/keyboard-backlight.svg?branch=master)](https://travis-ci.com/alexmohr/keyboard-backlight)
 
 This repo provides an application and a systemd service which controls the 
 backlight of a keyboard. It's only tested for thinkpads but may work on 
