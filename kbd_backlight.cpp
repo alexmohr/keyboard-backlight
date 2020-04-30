@@ -231,6 +231,7 @@ std::vector<int> open_devices(const std::vector<std::string> &input_devices) {
 
 void brightness_control(const std::string &brightnessPath,
 						unsigned long timeoutMs) {
+  unsigned long tmpBrightness = currentBrightness_;
   while (!end_) {
 	auto passedMs = std::chrono::duration_cast<
 		std::chrono::milliseconds>(
@@ -255,9 +256,9 @@ void brightness_control(const std::string &brightnessPath,
 				  originalBrightness_,
 				  currentBrightness_);
 
-	  file_read_uint64(brightnessPath, &currentBrightness_);
-	  if (currentBrightness_ != 0) {
-		originalBrightness_ = currentBrightness_;
+	  file_read_uint64(brightnessPath, &tmpBrightness);
+	  if (tmpBrightness != 0) {
+		originalBrightness_ = tmpBrightness;
 		currentBrightness_ = 0;
 		file_write_uint64(brightnessPath, 0);
 		print_debug("New Original brightness: %lu New Current Brightness: %lu\n",
