@@ -50,6 +50,8 @@ uint64_t originalBrightness_;
 uint64_t currentBrightness_;
 
 bool end_ = false;
+const std::string DEFAULT_BACKLIGHT_PATH = "/sys/class/leds/tpacpi::kbd_backlight/brightness";
+
 
 enum MOUSE_MODE {
   ALL = 0,
@@ -80,9 +82,10 @@ void help(const char *name) {
 		 "       1 use all internal mice only\n"
 		 "       2 ignore mice\n"
 		 "    -b set keyboard backlight device path\n"
-		 "       defaults to /sys/class/leds/tpacpi::kbd_backlight\n"
+		 "       defaults to %s\n"
 		 "    -f stay in foreground and do not start daemon\n"
-		 "    -s Set a brightness value and exit\n"
+		 "    -s Set a brightness value and exit\n",
+		 DEFAULT_BACKLIGHT_PATH.c_str()
 
   );
 }
@@ -298,12 +301,16 @@ void signal_handler(int sig) {
 }
 
 bool is_brightness_writable(const std::string &brightnessPath) {
+  std::filesystem::path p(brightnessPath);
+  if (!std::filesystem::exists(p)) {
+	printf("Brightness device %s does not exist\n", brightnessPath.c_str());
+	return false;
+  }
+
   if (!file_read_uint64(brightnessPath, &originalBrightness_)
 	  || !file_write_uint64(brightnessPath, originalBrightness_)) {
-	std::cout << "Write access to brightness device "
-			  << brightnessPath
-			  << " failed. Please run with root privileges"
-			  << std::endl;
+	printf("Write access to brightness device %s failed."
+		   " Please run with root privileges", brightnessPath.c_str());
 	return false;
   }
   return true;
@@ -390,8 +397,9 @@ int main(int argc, char **argv) {
   unsigned long timeout = 15;
   long setBrightness = -1;
   MOUSE_MODE mouseMode = MOUSE_MODE::ALL;
-  std::string backlightPath = "/sys/class/leds/tpacpi::kbd_backlight";
+
   bool foreground = false;
+  std::string backlightPath = DEFAULT_BACKLIGHT_PATH;
   print_debug_n("Parsing options...\n");
   parse_opts(argc,
 			 argv,
@@ -401,6 +409,7 @@ int main(int argc, char **argv) {
 			 backlightPath,
 			 foreground,
 			 setBrightness);
+  print_debug("Using backlight device: %s\n", backlightPath.c_str());
 
   print_debug_n("Getting keyboards...\n");
   get_keyboards(ignoredDevices, inputDevices);
@@ -430,17 +439,12 @@ int main(int argc, char **argv) {
 	exit(EXIT_FAILURE);
   }
 
-  if (backlightPath.at(backlightPath.size() - 1) != '/') {
-	backlightPath += '/';
-  }
-
-  std::string brightnessPath = backlightPath + "brightness";
-  if (!is_brightness_writable(brightnessPath)) {
+  if (!is_brightness_writable(backlightPath)) {
 	exit(EXIT_FAILURE);
   }
 
   if (setBrightness >= 0) {
-	file_write_uint64(brightnessPath, setBrightness);
+	file_write_uint64(backlightPath, setBrightness);
 	exit(0);
   }
 
@@ -464,10 +468,10 @@ int main(int argc, char **argv) {
 	f.emplace_back(std::async(std::launch::async,
 							  read_events,
 							  fd,
-							  brightnessPath));
+							  backlightPath));
   }
 
-  brightness_control(brightnessPath, timeout * 1000);
+  brightness_control(backlightPath, timeout * 1000);
 
   for (const auto &fd : fds) {
 	close(fd);
