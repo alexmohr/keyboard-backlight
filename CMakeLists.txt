@@ -7,6 +7,7 @@ set(PROJECT_VERSION_PATCH  0)
 # Add version compile definition
 add_compile_definitions(VERSION="${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}")
 
+
 set(CMAKE_INSTALL_PREFIX /usr/bin)
 set(CMAKE_CXX_STANDARD 17)
 
@@ -28,6 +29,8 @@ set(OPTIMIZATION_LEVEL "-O3")
 # ""    None
 set(DEBUG_LEVEL "")
 
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DDEBUG=1")
+
 # Configure C++ compiler flags
 set(CMAKE_CXX_FLAGS "${OPTIMIZATION_LEVEL} \
     ${DEBUG_LEVEL} \
@@ -40,10 +43,16 @@ set(APP_TARGET_PATH ${CMAKE_INSTALL_PREFIX}/keyboard_backlight)
 set(APP_NAME keyboard_backlight)
 
 find_package (Threads)
+# Some versions of gcc need to link filesystem lib
+if (CMAKE_CXX_COMPILER_ID STREQUAL GNU)
+    set(CXX_FILESYSTEM_LIBRARIES stdc++fs)
+else()
+    set(CXX_FILESYSTEM_LIBRARIES)
+endif()
 
 
 add_executable(${APP_NAME} kbd_backlight.cpp)
-target_link_libraries (keyboard_backlight ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries (keyboard_backlight ${CMAKE_THREAD_LIBS_INIT} ${CXX_FILESYSTEM_LIBRARIES})
 
 install(TARGETS keyboard_backlight DESTINATION ${CMAKE_INSTALL_PREFIX})
 

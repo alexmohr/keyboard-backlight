@@ -57,6 +57,14 @@ enum MOUSE_MODE {
   NONE = 2
 };
 
+#if DEBUG
+#define print_debug(fmt, ...) printf("%s:%d: " fmt, __FILE__, __LINE__, __VA_ARGS__)
+#define print_debug_n(fmt) printf("%s:%d: " fmt, __FILE__, __LINE__)
+#else
+#define print_debug(...)
+#define print_debug_n(...)
+#endif
+
 void help(const char *name) {
   printf("%s %s \n", name, VERSION);
   printf(""
@@ -143,35 +151,36 @@ void get_keyboards(std::vector<std::string> &ignoredDevices,
   const std::string path = "/proc/bus/input/devices";
   std::ifstream file(path);
   if (!file.is_open()) {
+	print_debug("Failed to open %s...\n", path.c_str());
 	return;
   }
 
+  bool isKeyboard = false;
   std::string line;
-  std::string name;
   std::string token;
   std::istringstream ss;
   while (std::getline(file, line)) {
 	// get device name
-	if (line.find("N: ") != std::string::npos) {
-	  if (line.find("keyboard") != std::string::npos) {
-		name = line;
-	  } else {
-		name.clear();
-	  }
+	if (line.find("Name=") != std::string::npos) {
+	  isKeyboard = line.find("keyboard") != std::string::npos;
 	}
 
 	if (line.find("Handlers=") != std::string::npos) {
-	  // if name is empty here the device is not a keyboard
-	  if (name.empty()) {
+	  if (!isKeyboard) {
 		continue;
 	  }
+
+	  print_debug("Detected keyboard, handlers: %s\n", line.c_str());
 
 	  ss = std::istringstream(line);
 	  while (std::getline(ss, token, ' ')) {
 		if (token.find("event") != std::string::npos) {
 		  std::string deviceEventPath = "/dev/input/" + token;
 		  if (!is_device_ignored(deviceEventPath, ignoredDevices)) {
+			print_debug_n("Added keyboard\n");
 			keyboards.emplace_back(deviceEventPath);
+		  } else {
+			print_debug_n("Keyboard is ignored\n");
 		  }
 		  break;
 		}
@@ -231,25 +240,19 @@ void brightness_control(const std::string &brightnessPath,
 	passedMs = std::chrono::duration_cast<
 		std::chrono::milliseconds>(
 		std::chrono::system_clock::now() - lastEvent_);
-#if DEBUG
-	printf("passed: %lu\n", passedMs.count());
-#endif
+	print_debug("passed: %lu\n", passedMs.count());
 	if (passedMs.count() >= static_cast<long>(timeoutMs)) {
 
-#if DEBUG
-	  printf("timeoutMs reached \n");
-	  printf("o: %lu c: %lu\n", originalBrightness_, currentBrightness_);
-#endif
+	  print_debug_n("timeoutMs reached \n");
+	  print_debug("o: %lu c: %lu\n", originalBrightness_, currentBrightness_);
 
 	  file_read_uint64(brightnessPath, &currentBrightness_);
 	  if (currentBrightness_ != 0) {
 		originalBrightness_ = currentBrightness_;
 		currentBrightness_ = 0;
 		file_write_uint64(brightnessPath, 0);
-#if DEBUG
-		printf("o: %lu c: %lu\n", originalBrightness_, currentBrightness_);
-		printf("turning off \n");
-#endif
+		print_debug("o: %lu c: %lu\n", originalBrightness_, currentBrightness_);
+		print_debug_n("turning off \n");
 	  }
 
 	  lastEvent_ = std::chrono::system_clock::now();
@@ -268,9 +271,7 @@ void read_events(int devFd, const std::string &brightnessPath) {
 		file_write_uint64(brightnessPath, originalBrightness_);
 		currentBrightness_ = originalBrightness_;
 
-#if DEBUG
-		printf("on\n");
-#endif
+		print_debug_n("on\n");
 	  }
 	}
   }
@@ -309,7 +310,7 @@ void parse_opts(int argc,
   int c;
   std::istringstream ss;
   std::string token;
-  unsigned long mode;
+  long mode;
 
   while ((c = getopt(argc, argv, "hs:i:t:m:b:f")) != -1) {
 	switch (c) {
@@ -342,7 +343,7 @@ void parse_opts(int argc,
 		}
 		break;
 	  case 'm':
-		mode = strtoul(optarg, nullptr, 0);
+		mode = strtol(optarg, nullptr, 0);
 		if ((MOUSE_MODE::ALL > mode) | (MOUSE_MODE::NONE < mode)) {
 		  printf("%s is not a valid mouse mode\n", optarg);
 		  exit(EXIT_FAILURE);
@@ -381,6 +382,7 @@ int main(int argc, char **argv) {
   MOUSE_MODE mouseMode = MOUSE_MODE::ALL;
   std::string backlightPath = "/sys/class/leds/tpacpi::kbd_backlight";
   bool foreground = false;
+  print_debug_n("Parsing options...\n");
   parse_opts(argc,
 			 argv,
 			 ignoredDevices,
@@ -390,6 +392,7 @@ int main(int argc, char **argv) {
 			 foreground,
 			 setBrightness);
 
+  print_debug_n("Getting keyboards...\n");
   get_keyboards(ignoredDevices, inputDevices);
   if (inputDevices.empty()) {
 	std::cout << "Warning no keyboards found!" << std::endl;
@@ -459,5 +462,6 @@ int main(int argc, char **argv) {
   for (const auto &fd : fds) {
 	close(fd);
   }
+
   exit(0);
 }
