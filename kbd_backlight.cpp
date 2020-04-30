@@ -236,7 +236,7 @@ void brightness_control(const std::string &brightnessPath,
 	if (lastEvent_ < std::chrono::system_clock::now()) {
 	  auto sleepTime = std::chrono::milliseconds(timeoutMs - passedMs.count());
 	  if (0 != sleepTime.count()) {
-	    print_debug("Sleeping for %lu ms\n", sleepTime.count());
+		print_debug("Sleeping for %lu ms\n", sleepTime.count());
 		std::this_thread::sleep_for(sleepTime);
 	  }
 	}
@@ -300,8 +300,10 @@ void signal_handler(int sig) {
 bool is_brightness_writable(const std::string &brightnessPath) {
   if (!file_read_uint64(brightnessPath, &originalBrightness_)
 	  || !file_write_uint64(brightnessPath, originalBrightness_)) {
-	std::cout << "Write access to brightness device descriptor failed.\n"
-				 "Please run with root privileges" << std::endl;
+	std::cout << "Write access to brightness device "
+			  << brightnessPath
+			  << " failed. Please run with root privileges"
+			  << std::endl;
 	return false;
   }
   return true;
