@@ -10,8 +10,12 @@ other devices as well
 ### Arch Linux
 The package is in the AUR and called  ``tp-kb-backlight-git``
 
-### Install from source
-To build the binary run
+### Build from source
+Requirements to build the software from source are:
+* Compiler with C++17 suppport
+* CMake
+
+To build the binary run:
 ````
 mkdir build
 cd build
@@ -52,7 +56,7 @@ sudo rm /usr/bin/keyboard_backlight
 
 ## Configuration
 ````
-keyboard_backlight 1.2.1 
+keyboard_backlight 1.3.0 
     -h show this help
     -i ignore an input device
        This device does not re enable keyboard backlight.
@@ -65,9 +69,8 @@ keyboard_backlight 1.2.1
        1 use all internal mice only
        2 ignore mice
     -b set keyboard backlight device path
-       defaults to /sys/class/leds/tpacpi::kbd_backlight
+       defaults to /sys/class/leds/tpacpi::kbd_backlight/brightness
     -f stay in foreground and do not start daemon
-    -s Set a brightness value from 0..2 and exit
+    -s Set a brightness value and exit
 ````
-
 

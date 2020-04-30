@@ -35,11 +35,13 @@
 
 #include <vector>
 #include <string>
+#include <sstream>
 #include <iostream>
 #include <filesystem>
 #include <regex>
 #include <future>
 #include <csignal>
+#include <fstream>
 
 using namespace std::chrono_literals;
 
@@ -48,6 +50,8 @@ uint64_t originalBrightness_;
 uint64_t currentBrightness_;
 
 bool end_ = false;
+const std::string DEFAULT_BACKLIGHT_PATH = "/sys/class/leds/tpacpi::kbd_backlight/brightness";
+
 
 enum MOUSE_MODE {
   ALL = 0,
@@ -55,7 +59,15 @@ enum MOUSE_MODE {
   NONE = 2
 };
 
-void help(const char* name) {
+#if DEBUG
+#define print_debug(fmt, ...) printf("%s:%d: " fmt, __FILE__, __LINE__, __VA_ARGS__)
+#define print_debug_n(fmt) printf("%s:%d: " fmt, __FILE__, __LINE__)
+#else
+#define print_debug(...)
+#define print_debug_n(...)
+#endif
+
+void help(const char *name) {
   printf("%s %s \n", name, VERSION);
   printf(""
 		 "    -h show this help\n"
@@ -70,9 +82,10 @@ void help(const char* name) {
 		 "       1 use all internal mice only\n"
 		 "       2 ignore mice\n"
 		 "    -b set keyboard backlight device path\n"
-		 "       defaults to /sys/class/leds/tpacpi::kbd_backlight\n"
+		 "       defaults to %s\n"
 		 "    -f stay in foreground and do not start daemon\n"
-		 "    -s Set a brightness value from 0..2 and exit\n"
+		 "    -s Set a brightness value and exit\n",
+		 DEFAULT_BACKLIGHT_PATH.c_str()
 
   );
 }
@@ -124,10 +137,68 @@ bool is_device_ignored(const std::string &device,
   return false;
 }
 
-void get_devices_for_path(const std::vector<std::string> &ignoredDevices,
-						  const std::string &devicePath,
-						  const std::regex &regex,
-						  std::vector<std::string> &devices) {
+/* Get keyboards from /proc/bus/input/devices
+ * Example entry
+	I: Bus=0011 Vendor=0001 Product=0001 Version=ab54
+	N: Name="AT Translated Set 2 keyboard"
+	P: Phys=isa0060/serio0/input0
+	S: Sysfs=/devices/platform/i8042/serio0/input/input3
+	U: Uniq=
+	H: Handlers=sysrq kbd event3 leds
+	B: PROP=0
+	B: EV=120013
+	B: KEY=402000000 3803078f800d001 feffffdfffefffff fffffffffffffffe
+ */
+void get_keyboards(std::vector<std::string> &ignoredDevices,
+				   std::vector<std::string> &keyboards) {
+  const std::string path = "/proc/bus/input/devices";
+  std::ifstream file(path);
+  if (!file.is_open()) {
+	print_debug("Failed to open %s...\n", path.c_str());
+	return;
+  }
+
+  bool isKeyboard = false;
+  std::string line;
+  std::string token;
+  std::istringstream ss;
+  while (std::getline(file, line)) {
+	// get device name
+	if (line.find("Name=") != std::string::npos) {
+	  isKeyboard = line.find("keyboard") != std::string::npos;
+	  if (isKeyboard) {
+		print_debug("Detected keyboard: %s\n", line.c_str());
+	  } else {
+		print_debug("Ignoring non keyboard device: %s\n", line.c_str());
+	  }
+	}
+
+	if (line.find("Handlers=") != std::string::npos) {
+	  if (!isKeyboard) {
+		continue;
+	  }
+
+	  ss = std::istringstream(line);
+	  while (std::getline(ss, token, ' ')) {
+		if (token.find("event") != std::string::npos) {
+		  std::string deviceEventPath = "/dev/input/" + token;
+		  if (!is_device_ignored(deviceEventPath, ignoredDevices)) {
+			print_debug_n("Added keyboard\n");
+			keyboards.emplace_back(deviceEventPath);
+		  } else {
+			print_debug_n("Keyboard is ignored\n");
+		  }
+		  break;
+		}
+	  }
+	}
+  }
+}
+
+void get_devices_in_path(const std::vector<std::string> &ignoredDevices,
+						 const std::string &devicePath,
+						 const std::regex &regex,
+						 std::vector<std::string> &devices) {
   for (const auto &dev : std::filesystem::directory_iterator(devicePath)) {
 	if (is_device_ignored(dev.path(), ignoredDevices)) {
 	  continue;
@@ -157,8 +228,10 @@ std::vector<int> open_devices(const std::vector<std::string> &input_devices) {
   }
   return fds;
 }
+
 void brightness_control(const std::string &brightnessPath,
 						unsigned long timeoutMs) {
+  unsigned long tmpBrightness = currentBrightness_;
   while (!end_) {
 	auto passedMs = std::chrono::duration_cast<
 		std::chrono::milliseconds>(
@@ -167,6 +240,7 @@ void brightness_control(const std::string &brightnessPath,
 	if (lastEvent_ < std::chrono::system_clock::now()) {
 	  auto sleepTime = std::chrono::milliseconds(timeoutMs - passedMs.count());
 	  if (0 != sleepTime.count()) {
+		print_debug("Sleeping for %lu ms\n", sleepTime.count());
 		std::this_thread::sleep_for(sleepTime);
 	  }
 	}
@@ -174,26 +248,20 @@ void brightness_control(const std::string &brightnessPath,
 	passedMs = std::chrono::duration_cast<
 		std::chrono::milliseconds>(
 		std::chrono::system_clock::now() - lastEvent_);
-#if DEBUG
-	printf("passed: %lu\n", passedMs.count());
-#endif
+	print_debug("Ms since last event: %lu\n", passedMs.count());
 	if (passedMs.count() >= static_cast<long>(timeoutMs)) {
 
-#if DEBUG
-	  printf("timeoutMs reached \n");
-	  printf("o: %lu c: %lu\n", originalBrightness_, currentBrightness_);
-#endif
+	  print_debug_n("Timeout reached \n");
 
-	  if (currentBrightness_ != 0) {
-		file_read_uint64(brightnessPath, &originalBrightness_);
+	  file_read_uint64(brightnessPath, &tmpBrightness);
+	  if (tmpBrightness != 0) {
+		originalBrightness_ = tmpBrightness;
 		currentBrightness_ = 0;
-
 		file_write_uint64(brightnessPath, 0);
-
-#if DEBUG
-		printf("o: %lu c: %lu\n", originalBrightness_, currentBrightness_);
-		printf("turning off \n");
-#endif
+		print_debug("New Original brightness: %lu New Current Brightness: %lu\n",
+					originalBrightness_,
+					currentBrightness_);
+		print_debug_n("Turning lights off\n");
 	  }
 
 	  lastEvent_ = std::chrono::system_clock::now();
@@ -212,9 +280,7 @@ void read_events(int devFd, const std::string &brightnessPath) {
 		file_write_uint64(brightnessPath, originalBrightness_);
 		currentBrightness_ = originalBrightness_;
 
-#if DEBUG
-		printf("on\n");
-#endif
+		print_debug("Event in fd %i, turning lights on\n", devFd);
 	  }
 	}
   }
@@ -233,10 +299,16 @@ void signal_handler(int sig) {
 }
 
 bool is_brightness_writable(const std::string &brightnessPath) {
+  std::filesystem::path p(brightnessPath);
+  if (!std::filesystem::exists(p)) {
+	printf("Brightness device %s does not exist\n", brightnessPath.c_str());
+	return false;
+  }
+
   if (!file_read_uint64(brightnessPath, &originalBrightness_)
 	  || !file_write_uint64(brightnessPath, originalBrightness_)) {
-	std::cout << "Write access to brightness device descriptor failed.\n"
-				 "Please run with root privileges" << std::endl;
+	printf("Write access to brightness device %s failed."
+		   " Please run with root privileges", brightnessPath.c_str());
 	return false;
   }
   return true;
@@ -253,7 +325,7 @@ void parse_opts(int argc,
   int c;
   std::istringstream ss;
   std::string token;
-  unsigned long mode;
+  long mode;
 
   while ((c = getopt(argc, argv, "hs:i:t:m:b:f")) != -1) {
 	switch (c) {
@@ -267,10 +339,26 @@ void parse_opts(int argc,
 		ss = std::istringstream(optarg);
 		while (std::getline(ss, token, ' ')) {
 		  ignoredDevices.push_back(token);
+
+		  // if the device is a symlink add the actual target to the
+		  // ignored device list too
+		  std::filesystem::path p = token;
+		  if (!std::filesystem::exists(p))
+			continue;
+
+		  std::filesystem::current_path(p.parent_path());
+		  if (std::filesystem::is_symlink(p)) {
+			p = std::filesystem::read_symlink(p);
+		  }
+
+		  if (!p.is_absolute()) {
+			p = std::filesystem::canonical(p);
+		  }
+		  ignoredDevices.push_back(p);
 		}
 		break;
 	  case 'm':
-		mode = strtoul(optarg, nullptr, 0);
+		mode = strtol(optarg, nullptr, 0);
 		if ((MOUSE_MODE::ALL > mode) | (MOUSE_MODE::NONE < mode)) {
 		  printf("%s is not a valid mouse mode\n", optarg);
 		  exit(EXIT_FAILURE);
@@ -286,10 +374,6 @@ void parse_opts(int argc,
 		break;
 	  case 's':
 		setBrightness = strtol(optarg, nullptr, 0);
-		if (setBrightness > 2 || setBrightness < 0) {
-		  printf("%s is not a valid brightness\n", optarg);
-		  exit(EXIT_FAILURE);
-		}
 		break;
 	  case 'h':
 	  default:
@@ -311,8 +395,10 @@ int main(int argc, char **argv) {
   unsigned long timeout = 15;
   long setBrightness = -1;
   MOUSE_MODE mouseMode = MOUSE_MODE::ALL;
-  std::string backlightPath = "/sys/class/leds/tpacpi::kbd_backlight";
+
   bool foreground = false;
+  std::string backlightPath = DEFAULT_BACKLIGHT_PATH;
+  print_debug_n("Parsing options...\n");
   parse_opts(argc,
 			 argv,
 			 ignoredDevices,
@@ -321,24 +407,26 @@ int main(int argc, char **argv) {
 			 backlightPath,
 			 foreground,
 			 setBrightness);
+  print_debug("Using backlight device: %s\n", backlightPath.c_str());
 
-  get_devices_for_path(ignoredDevices,
-					   "/dev/input/by-path",
-					   std::regex(".*event\\-kbd.*"),
-					   inputDevices);
+  print_debug_n("Getting keyboards...\n");
+  get_keyboards(ignoredDevices, inputDevices);
+  if (inputDevices.empty()) {
+	std::cout << "Warning no keyboards found!" << std::endl;
+  }
 
   switch (mouseMode) {
 	case ALL:
-	  get_devices_for_path(ignoredDevices,
-						   "/dev/input/",
-						   std::regex(".*mice.*"),
-						   inputDevices);
+	  get_devices_in_path(ignoredDevices,
+						  "/dev/input/",
+						  std::regex(".*mice.*"),
+						  inputDevices);
 	  break;
 	case INTERNAL:
-	  get_devices_for_path(ignoredDevices,
-						   "/dev/input/by-path",
-						   std::regex("..*event\\-mouse.*"),
-						   inputDevices);
+	  get_devices_in_path(ignoredDevices,
+						  "/dev/input/by-path",
+						  std::regex("..*event\\-mouse.*"),
+						  inputDevices);
 	  break;
 	case NONE:
 	  break;
@@ -349,17 +437,12 @@ int main(int argc, char **argv) {
 	exit(EXIT_FAILURE);
   }
 
-  if (backlightPath.at(backlightPath.size() - 1) != '/') {
-	backlightPath += '/';
-  }
-
-  std::string brightnessPath = backlightPath + "brightness";
-  if (!is_brightness_writable(brightnessPath)){
-    exit(EXIT_FAILURE);
+  if (!is_brightness_writable(backlightPath)) {
+	exit(EXIT_FAILURE);
   }
 
   if (setBrightness >= 0) {
-	file_write_uint64(brightnessPath, setBrightness);
+	file_write_uint64(backlightPath, setBrightness);
 	exit(0);
   }
 
@@ -383,13 +466,14 @@ int main(int argc, char **argv) {
 	f.emplace_back(std::async(std::launch::async,
 							  read_events,
 							  fd,
-							  brightnessPath));
+							  backlightPath));
   }
 
-  brightness_control(brightnessPath, timeout * 1000);
+  brightness_control(backlightPath, timeout * 1000);
 
   for (const auto &fd : fds) {
 	close(fd);
   }
+
   exit(0);
 }
