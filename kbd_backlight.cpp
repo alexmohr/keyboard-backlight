@@ -163,14 +163,17 @@ void get_keyboards(std::vector<std::string> &ignoredDevices,
 	// get device name
 	if (line.find("Name=") != std::string::npos) {
 	  isKeyboard = line.find("keyboard") != std::string::npos;
+	  if (isKeyboard) {
+		print_debug("Detected keyboard: %s\n", line.c_str());
+	  } else {
+		print_debug("Ignoring non keyboard device: %s\n", line.c_str());
+	  }
 	}
 
 	if (line.find("Handlers=") != std::string::npos) {
 	  if (!isKeyboard) {
 		continue;
 	  }
-
-	  print_debug("Detected keyboard, handlers: %s\n", line.c_str());
 
 	  ss = std::istringstream(line);
 	  while (std::getline(ss, token, ' ')) {
@@ -233,6 +236,7 @@ void brightness_control(const std::string &brightnessPath,
 	if (lastEvent_ < std::chrono::system_clock::now()) {
 	  auto sleepTime = std::chrono::milliseconds(timeoutMs - passedMs.count());
 	  if (0 != sleepTime.count()) {
+	    print_debug("Sleeping for %lu ms\n", sleepTime.count());
 		std::this_thread::sleep_for(sleepTime);
 	  }
 	}
@@ -240,19 +244,23 @@ void brightness_control(const std::string &brightnessPath,
 	passedMs = std::chrono::duration_cast<
 		std::chrono::milliseconds>(
 		std::chrono::system_clock::now() - lastEvent_);
-	print_debug("passed: %lu\n", passedMs.count());
+	print_debug("Ms since last event: %lu\n", passedMs.count());
 	if (passedMs.count() >= static_cast<long>(timeoutMs)) {
 
-	  print_debug_n("timeoutMs reached \n");
-	  print_debug("o: %lu c: %lu\n", originalBrightness_, currentBrightness_);
+	  print_debug_n("Timeout reached \n");
+	  print_debug("Original brightness: %lu Current Brightness: %lu\n",
+				  originalBrightness_,
+				  currentBrightness_);
 
 	  file_read_uint64(brightnessPath, &currentBrightness_);
 	  if (currentBrightness_ != 0) {
 		originalBrightness_ = currentBrightness_;
 		currentBrightness_ = 0;
 		file_write_uint64(brightnessPath, 0);
-		print_debug("o: %lu c: %lu\n", originalBrightness_, currentBrightness_);
-		print_debug_n("turning off \n");
+		print_debug("New Original brightness: %lu New Current Brightness: %lu\n",
+					originalBrightness_,
+					currentBrightness_);
+		print_debug_n("Turning lights off\n");
 	  }
 
 	  lastEvent_ = std::chrono::system_clock::now();
@@ -271,7 +279,7 @@ void read_events(int devFd, const std::string &brightnessPath) {
 		file_write_uint64(brightnessPath, originalBrightness_);
 		currentBrightness_ = originalBrightness_;
 
-		print_debug_n("on\n");
+		print_debug("Event in fd %i, turning lights on\n", devFd);
 	  }
 	}
   }

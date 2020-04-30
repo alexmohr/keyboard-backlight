@@ -10,8 +10,12 @@ other devices as well
 ### Arch Linux
 The package is in the AUR and called  ``tp-kb-backlight-git``
 
-### Install from source
-To build the binary run
+### Build from source
+Requirements to build the software from source are:
+* Compiler with C++17 suppport
+* CMake
+
+To build the binary run:
 ````
 mkdir build
 cd build
