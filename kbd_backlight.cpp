@@ -436,7 +436,7 @@ int main(int argc, char **argv) {
   std::vector<std::string> inputDevices;
   std::vector<std::string> ignoredDevices;
   std::map<int, bool> ignoredKeys;
-	bool showPressedKeys = false;
+  bool showPressedKeys = false;
 
   signal(SIGTERM, signal_handler);
   signal(SIGKILL, signal_handler);
