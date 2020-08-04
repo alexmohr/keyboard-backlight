@@ -297,6 +297,8 @@ void read_events(int devFd, const std::string &brightnessPath,
 							  ie.value) != std::end(ignoredKeys))
 				{
 					correctKey = false;
+					// There are 3 events for every key press, so we are ignoring
+					// the next 2 events
 					ignoreNextValues = 2;
 #if DEBUG_KEYS_IGNORE
 					printf("Ignoring key: type: %u, code: %u, value: %d\n",
