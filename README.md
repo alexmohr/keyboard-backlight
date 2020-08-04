@@ -72,5 +72,9 @@ keyboard_backlight 1.3.0
        defaults to /sys/class/leds/tpacpi::kbd_backlight/brightness
     -f stay in foreground and do not start daemon
     -s Set a brightness value and exit
+    -k (key code) Ignore key code
+       You can get the values using -d option.
+       Separate multiple values by comma, e.g. '10,20,30'.
+    -d Show pressed key codes
 ````
 
