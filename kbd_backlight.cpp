@@ -283,14 +283,14 @@ void read_events(int devFd, const std::string &brightnessPath,
 		int rd = read(devFd, &ie, sizeof(struct input_event));
 		if (rd != 0)
 		{
-			if (showPressedKeys && ie.type == 4 && ie.code == 4)
+			if (showPressedKeys && ie.type == EV_MSC && ie.code == MSC_SCAN)
 			{
 				printf("Pressed key value: %d\n", ie.value);
 				fflush(stdout);
 			}
 
 			bool correctKey = true;
-			if (ie.type == 4 && ie.code == 4)
+			if (ie.type == EV_MSC && ie.code == MSC_SCAN)
 			{
 				if (std::find(std::begin(ignoredKeys),
 							  std::end(ignoredKeys),
