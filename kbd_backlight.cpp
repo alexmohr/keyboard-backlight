@@ -274,56 +274,63 @@ void brightness_control(const std::string &brightnessPath,
 }
 
 void read_events(int devFd, const std::string &brightnessPath,
-				 const std::vector<int> &ignoredKeys, bool showPressedKeys) {
-  int ignoreNextValues = 0;
-  while (!end_) {
-	struct input_event ie = {};
-	int rd = read(devFd, &ie, sizeof(struct input_event));
-	if (rd != 0){
-		if (showPressedKeys && ie.type == 4 && ie.code == 4)
+				 const std::vector<int> &ignoredKeys, bool showPressedKeys)
+{
+	int ignoreNextValues = 0;
+	while (!end_)
+	{
+		struct input_event ie = {};
+		int rd = read(devFd, &ie, sizeof(struct input_event));
+		if (rd != 0)
 		{
-			printf("Pressed key value: %d\n", ie.value);
-			fflush(stdout);
-		}
-		
-		bool correctKey = true;
-		if (ie.type == 4 && ie.code == 4) {
-			if (std::find(std::begin(ignoredKeys), 
-						  std::end(ignoredKeys), 
-						  ie.value) != std::end(ignoredKeys)) {
-				correctKey = false;
-				ignoreNextValues = 2;
+			if (showPressedKeys && ie.type == 4 && ie.code == 4)
+			{
+				printf("Pressed key value: %d\n", ie.value);
+				fflush(stdout);
+			}
+
+			bool correctKey = true;
+			if (ie.type == 4 && ie.code == 4)
+			{
+				if (std::find(std::begin(ignoredKeys),
+							  std::end(ignoredKeys),
+							  ie.value) != std::end(ignoredKeys))
+				{
+					correctKey = false;
+					ignoreNextValues = 2;
 #if DEBUG_KEYS_IGNORE
-			printf("Ignoring key: type: %u, code: %u, value: %d\n",
-			 				ie.type, ie.code, ie.value);
-			fflush(stdout);
+					printf("Ignoring key: type: %u, code: %u, value: %d\n",
+						   ie.type, ie.code, ie.value);
+					fflush(stdout);
 #endif
+				}
+			}
+			else if (ignoreNextValues > 0)
+			{
+				correctKey = false;
+				ignoreNextValues--;
+			}
+
+			if (correctKey)
+			{
+#if DEBUG_KEYS_IGNORE
+				printf("Processing key type: %u, code: %u, value: %d\n",
+					   ie.type, ie.code, ie.value);
+				fflush(stdout);
+#endif
+				lastEvent_ = std::chrono::system_clock::now();
+
+				if (currentBrightness_ != originalBrightness_)
+				{
+					file_write_uint64(brightnessPath, originalBrightness_);
+					currentBrightness_ = originalBrightness_;
+
+					print_debug("Event in fd %i, turning lights on\n", devFd);
+				}
 			}
 		}
-		else if (ignoreNextValues > 0)
-		{
-			correctKey = false;
-			ignoreNextValues--;
-		}
-
-		if (correctKey) {
-#if DEBUG_KEYS_IGNORE
-			printf("Processing key type: %u, code: %u, value: %d\n", 
-							ie.type, ie.code, ie.value);
-			fflush(stdout);
-#endif
-			lastEvent_ = std::chrono::system_clock::now();
-
-	  if (currentBrightness_ != originalBrightness_) {
-		file_write_uint64(brightnessPath, originalBrightness_);
-		currentBrightness_ = originalBrightness_;
-
-		print_debug("Event in fd %i, turning lights on\n", devFd);
-	  }
-		}
-  }
 	}
-  close(devFd);
+	close(devFd);
 }
 
 void signal_handler(int sig) {
