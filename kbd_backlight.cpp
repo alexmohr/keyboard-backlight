@@ -84,7 +84,11 @@ void help(const char *name) {
 		 "    -b set keyboard backlight device path\n"
 		 "       defaults to %s\n"
 		 "    -f stay in foreground and do not start daemon\n"
-		 "    -s Set a brightness value and exit\n",
+		 "    -s Set a brightness value and exit\n"
+		 "    -k (key code) Ignore key code\n"
+		 "       You can get the values using -d option.\n"
+		 "       Separate multiple values by comma, e.g. \'10,20,30\'.\n"
+		 "    -d Show pressed key codes\n",
 		 DEFAULT_BACKLIGHT_PATH.c_str()
 
   );
@@ -269,12 +273,46 @@ void brightness_control(const std::string &brightnessPath,
   }
 }
 
-void read_events(int devFd, const std::string &brightnessPath) {
+void read_events(int devFd, const std::string &brightnessPath,
+				 const std::vector<int> &ignoredKeys, bool showPressedKeys) {
+  int ignoreNextValues = 0;
   while (!end_) {
 	struct input_event ie = {};
 	int rd = read(devFd, &ie, sizeof(struct input_event));
-	if (rd != 0) {
-	  lastEvent_ = std::chrono::system_clock::now();
+	if (rd != 0){
+		if (showPressedKeys && ie.type == 4 && ie.code == 4)
+		{
+			printf("Pressed key value: %d\n", ie.value);
+			fflush(stdout);
+		}
+		
+		bool correctKey = true;
+		if (ie.type == 4 && ie.code == 4) {
+			if (std::find(std::begin(ignoredKeys), 
+						  std::end(ignoredKeys), 
+						  ie.value) != std::end(ignoredKeys)) {
+				correctKey = false;
+				ignoreNextValues = 2;
+#if DEBUG_KEYS_IGNORE
+			printf("Ignoring key: type: %u, code: %u, value: %d\n",
+			 				ie.type, ie.code, ie.value);
+			fflush(stdout);
+#endif
+			}
+		}
+		else if (ignoreNextValues > 0)
+		{
+			correctKey = false;
+			ignoreNextValues--;
+		}
+
+		if (correctKey) {
+#if DEBUG_KEYS_IGNORE
+			printf("Processing key type: %u, code: %u, value: %d\n", 
+							ie.type, ie.code, ie.value);
+			fflush(stdout);
+#endif
+			lastEvent_ = std::chrono::system_clock::now();
 
 	  if (currentBrightness_ != originalBrightness_) {
 		file_write_uint64(brightnessPath, originalBrightness_);
@@ -282,8 +320,9 @@ void read_events(int devFd, const std::string &brightnessPath) {
 
 		print_debug("Event in fd %i, turning lights on\n", devFd);
 	  }
-	}
+		}
   }
+	}
   close(devFd);
 }
 
@@ -321,13 +360,15 @@ void parse_opts(int argc,
 				MOUSE_MODE &mouseMode,
 				std::string &backlightPath,
 				bool &foreground,
-				long &setBrightness) {
+				long &setBrightness,
+				std::vector<int> &ignoredKeys,
+				bool &showPressedKeys) {
   int c;
   std::istringstream ss;
   std::string token;
   long mode;
 
-  while ((c = getopt(argc, argv, "hs:i:t:m:b:f")) != -1) {
+  while ((c = getopt(argc, argv, "hs:i:t:m:b:k:fd")) != -1) {
 	switch (c) {
 	  case 'b':
 		backlightPath = optarg;
@@ -375,6 +416,15 @@ void parse_opts(int argc,
 	  case 's':
 		setBrightness = strtol(optarg, nullptr, 0);
 		break;
+	  case 'k':
+		ss = std::istringstream(optarg);
+		while (std::getline(ss, token, ',')) {
+		  ignoredKeys.push_back(std::stoi(token));
+		}
+		break;
+	  case 'd':
+		showPressedKeys = true;
+		break;
 	  case 'h':
 	  default:
 		help(argv[0]);
@@ -388,6 +438,8 @@ int main(int argc, char **argv) {
 
   std::vector<std::string> inputDevices;
   std::vector<std::string> ignoredDevices;
+  std::vector<int> ignoredKeys;
+	bool showPressedKeys = false;
 
   signal(SIGTERM, signal_handler);
   signal(SIGKILL, signal_handler);
@@ -406,7 +458,9 @@ int main(int argc, char **argv) {
 			 mouseMode,
 			 backlightPath,
 			 foreground,
-			 setBrightness);
+			 setBrightness,
+			 ignoredKeys,
+			 showPressedKeys);
   print_debug("Using backlight device: %s\n", backlightPath.c_str());
 
   print_debug_n("Getting keyboards...\n");
@@ -466,7 +520,9 @@ int main(int argc, char **argv) {
 	f.emplace_back(std::async(std::launch::async,
 							  read_events,
 							  fd,
-							  backlightPath));
+							  backlightPath,
+							  ignoredKeys, 
+							  showPressedKeys));
   }
 
   brightness_control(backlightPath, timeout * 1000);
