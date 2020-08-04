@@ -274,7 +274,7 @@ void brightness_control(const std::string &brightnessPath,
 }
 
 void read_events(int devFd, const std::string &brightnessPath,
-				 const std::vector<int> &ignoredKeys, bool showPressedKeys)
+				 const std::map<int, bool> &ignoredKeys, bool showPressedKeys)
 {
 	int ignoreNextValues = 0;
 	while (!end_)
@@ -292,9 +292,7 @@ void read_events(int devFd, const std::string &brightnessPath,
 			bool correctKey = true;
 			if (ie.type == EV_MSC && ie.code == MSC_SCAN)
 			{
-				if (std::find(std::begin(ignoredKeys),
-							  std::end(ignoredKeys),
-							  ie.value) != std::end(ignoredKeys))
+				if (ignoredKeys.find(ie.value)->second == true)
 				{
 					correctKey = false;
 					// There are 3 events for every key press, so we are ignoring
@@ -370,7 +368,7 @@ void parse_opts(int argc,
 				std::string &backlightPath,
 				bool &foreground,
 				long &setBrightness,
-				std::vector<int> &ignoredKeys,
+				std::map<int, bool> &ignoredKeys,
 				bool &showPressedKeys) {
   int c;
   std::istringstream ss;
@@ -428,7 +426,7 @@ void parse_opts(int argc,
 	  case 'k':
 		ss = std::istringstream(optarg);
 		while (std::getline(ss, token, ',')) {
-		  ignoredKeys.push_back(std::stoi(token));
+		  ignoredKeys[std::stoi(token)] = true;
 		}
 		break;
 	  case 'd':
@@ -447,7 +445,7 @@ int main(int argc, char **argv) {
 
   std::vector<std::string> inputDevices;
   std::vector<std::string> ignoredDevices;
-  std::vector<int> ignoredKeys;
+  std::map<int, bool> ignoredKeys;
 	bool showPressedKeys = false;
 
   signal(SIGTERM, signal_handler);
