@@ -56,7 +56,7 @@ sudo rm /usr/bin/keyboard_backlight
 
 ## Configuration
 ````
-keyboard_backlight 1.3.0 
+keyboard_backlight 1.4.0 
     -h show this help
     -i ignore an input device
        This device does not re enable keyboard backlight.
