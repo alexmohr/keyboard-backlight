@@ -42,6 +42,7 @@
 #include <future>
 #include <csignal>
 #include <fstream>
+#include <thread>
 
 using namespace std::chrono_literals;
 
