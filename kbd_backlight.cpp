@@ -33,6 +33,7 @@
 #include <cstdlib>
 #include <cstdint>
 
+#include <algorithm>
 #include <vector>
 #include <string>
 #include <sstream>
@@ -168,17 +169,19 @@ void get_keyboards(std::vector<std::string> &ignoredDevices,
   std::string token;
   std::istringstream ss;
   while (std::getline(file, line)) {
+	auto lineLower = line;
+	std::transform(lineLower.begin(), lineLower.end(), lineLower.begin(), tolower);
 	// get device name
-	if (line.find("Name=") != std::string::npos) {
-	  isKeyboard = line.find("keyboard") != std::string::npos;
+	if (lineLower.find("name=") != std::string::npos) {
+	  isKeyboard = lineLower.find("keyboard") != std::string::npos;
 	  if (isKeyboard) {
-		print_debug("Detected keyboard: %s\n", line.c_str());
+		print_debug("Detected keyboard: %s\n", lineLower.c_str());
 	  } else {
-		print_debug("Ignoring non keyboard device: %s\n", line.c_str());
+		print_debug("Ignoring non keyboard device: %s\n", lineLower.c_str());
 	  }
 	}
 
-	if (line.find("Handlers=") != std::string::npos) {
+	if (lineLower.find("handlers=") != std::string::npos) {
 	  if (!isKeyboard) {
 		continue;
 	  }
