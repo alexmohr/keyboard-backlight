@@ -177,7 +177,7 @@ void get_keyboards(std::vector<std::string> &ignoredDevices,
 	  if (isKeyboard) {
 		print_debug("Detected keyboard: %s\n", lineLower.c_str());
 	  } else {
-		print_debug("Ignoring non keyboard device: %s\n", lineLower.c_str());
+		print_debug("Ignoring non keyboard device: %s, file: %s\n", lineLower.c_str(), path);
 	  }
 	}
 
@@ -209,11 +209,14 @@ void get_devices_in_path(const std::vector<std::string> &ignoredDevices,
 						 std::vector<std::string> &devices) {
   for (const auto &dev : std::filesystem::directory_iterator(devicePath)) {
 	if (is_device_ignored(dev.path(), ignoredDevices)) {
+	  print_debug("ignored device %s\n", dev.path());
 	  continue;
 	}
 
 	if (regex_match(std::string(dev.path()), regex)) {
 	  devices.push_back(dev.path());
+	} else {
+	  print_debug("regex did not match %s\n", dev.path().string().c_str());
 	}
   }
 }
@@ -470,11 +473,12 @@ int main(int argc, char **argv) {
 	std::cout << "Warning no keyboards found!" << std::endl;
   }
 
+  print_debug_n("Getting mice... \n");
   switch (mouseMode) {
 	case ALL:
 	  get_devices_in_path(ignoredDevices,
 						  "/dev/input/",
-						  std::regex(".*mice.*"),
+						  std::regex(".*mice.*|event[0-9]+"),
 						  inputDevices);
 	  break;
 	case INTERNAL:
